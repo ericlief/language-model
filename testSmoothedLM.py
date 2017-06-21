@@ -54,7 +54,7 @@ if __name__ == "__main__":
     """
     To run unittest:
 
-    python -m unittest -v languageModel.py
+    python -m unittest -v languagemodel.py
 
     """
     unittest.main()

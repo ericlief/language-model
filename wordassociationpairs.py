@@ -89,7 +89,7 @@ class WordAssociationPairs:
                 c_w2 = self._word_counts[w2]
                 if c_w1 + c_w2 < 20:
                     continue
-                pmi = np.log2(count * self._T / (c_w1 * c_w2))
+                pmi = np.log2(cohightunt * self._T / (c_w1 * c_w2))
                 self.pmi_dist_pairs[w1][w2] = pmi
                 print(w1,w2,pmi)
 

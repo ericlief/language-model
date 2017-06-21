@@ -37,7 +37,7 @@ class TestEntropy(unittest.TestCase):
     """
     To run unittest:
 
-    python -m unittest -v languageModel.py
+    python -m unittest -v languagemodel.py
 
     """
 
