@@ -143,7 +143,7 @@ class ClassBasedLM:
         for right in self._tokens[1:n]:
             pairs[left][right] += 1
             left = right
-d
+
         for left, seconds in pairs.items():
             for right, count in seconds.items():
                 c_l_r = self._bigram_counts[left][right]
@@ -181,14 +181,15 @@ d
         # print('done with adj pairs')
         return mi
 
+
     def merge(self):
         n = len(self._words_10x)
 
 
         for i in range(n-1, 0, -1):
             for m in range(n):
-                left = words_10x[i]
-                right = words_10x[j]
+                left = self._words_10x[i]
+                right = self._words_10x[j]
                 if bigram_counts.get(left):
                     if bigram_counts.get(left).get(right):  # should exist, but just in case...
                         count = bigram_counts.get(left).get(right)
