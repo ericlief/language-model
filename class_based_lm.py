@@ -12,6 +12,7 @@ from collections import Counter, defaultdict
 import io
 import sys
 import numpy as np
+import math
 
 class ClassBasedLM:
 
@@ -20,6 +21,7 @@ class ClassBasedLM:
         self._word_counts = Counter(tokens)
         # self._bigrams = self.findBigrams()
         # self._unigrams = self.findUnigrams()
+
         self._T = len(tokens)
 
         #self.counts_adj_pairs = defaultdict(lambda: defaultdict(lambda: 0))
@@ -47,29 +49,44 @@ class ClassBasedLM:
         and bigrams counts.
         """
         # Add start and end symbols
+
+        tokens = tokens[:8000]
         tokens = ['<s>'] + tokens + ['</s>']
+        # n = len(tokens)
 
         # Initialize bigram counts table
+        B = 0
         bigram_counts = defaultdict(lambda: defaultdict(lambda: 0))
         left = tokens[0]
         for right in tokens[1:]:
             bigram_counts[left][right] += 1
             left = right
+            B += 1
         self._bigram_counts = bigram_counts
 
         # Initialize unigram counts dictionaries
         # Build from bigram counts
         unigram_lhs_counts = defaultdict(lambda: 0)
         unigram_rhs_counts = defaultdict(lambda: 0)
+        unigram_counts = defaultdict(lambda: 0)
+        U = 0
         for left in bigram_counts:
             for right in bigram_counts[left]:
                 unigram_lhs_counts[left] += bigram_counts[left][right]
                 unigram_rhs_counts[right] += bigram_counts[left][right]
+                unigram_counts[left] += bigram_counts[left][right]
+                U += 1
         self._unigram_lhs_counts = unigram_lhs_counts
         self._unigram_rhs_counts = unigram_rhs_counts
+        self._unigram_counts = unigram_counts
+        L = sum(unigram_lhs_counts.values())
+        R = sum(unigram_rhs_counts.values())
+        print(L, R, L==R)
+        self._U = L
+        self._B = B
 
         # Initialize bigram class counts table
-        # class_counts = defaultdict(lambda: defaultdict(lambda: 0))
+        # class_counts_table = defaultdict(lambda: defaultdict(lambda: 0))
 
         # word_to_class = {}
 
@@ -80,18 +97,43 @@ class ClassBasedLM:
 
         # Wrong, compute 10X times in the 8k tokens, not whole text
         # words_10x = [token for token in words_8k if unigram_lhs_counts[token] >= 10]  # use right hand since no ending symbol inserted?
+
+        # words_8k = tokens
         words_8k = tokens[:8000]
+
+        # bg = list(zip(tokens, tokens[1:]))
+        # bg_c = Counter(bg)
+        # print(bg_c)
+        # mi = 0
+        # # unig = Counter(tokens)
+        # B = len(bg)
+        # T = len(tokens)
+        # for (left,right), count in bg_c.items():
+        #
+        #     # for right in self.bigram_counts[left]:
+        #         # print(left, right, self.bigram_counts[left][right])
+        #     c_l_r = count
+        #     # c_l = self._unigram_counts[left]
+        #     # c_r = self._unigram_counts[right]
+        #     c_l = unig[left]
+        #     c_r = unig[right]
+        #     mi += c_l_r / float(B) * np.log2(B * c_l_r / ((float(c_l) * c_r)))
+        #     # self.pmi_adj_pairs[left][right] = pmi
+        #
+        # print('done with MI', mi, B)
+
         word_count = Counter(words_8k)
-        word_count_10x = [(w, c) for w, c in word_count.items() if c >= 10]             # [('man', 3), ('the', 22),  ...]
+        word_count_10x = [(w, c) for w, c in word_count.items() if c >= 2]              # [('man', 3), ('the', 22),  ...]
         word_count_10x = sorted(word_count_10x, key=lambda x: x[1], reverse=True)       # [('the', 22), ('man', 3), ...]
         words_10x = [w for w, c in word_count_10x ]                                     # [('the', 'man', ...]
         word_to_class = {w: i for i, w in enumerate(words_10x)}                         # {'the': 0, 'man': 1, ...}
         class_to_word = {i: set([w]) for i, w in enumerate(words_10x)}                  # {0: {'the',...}, 1: {'man',...}, ...}
 
+
         # Construct table of bigram class counts
         # QUESTION: Do we need to add a start/end symbol here?
         n = len(words_10x)
-        class_counts = [n*[0] for x in range(n)]
+        class_counts_table = [n*[0] for x in range(n)]
         for i in range(n):
             for j in range(n):
                 left = words_10x[i]
@@ -99,9 +141,23 @@ class ClassBasedLM:
                 if bigram_counts.get(left):
                     if bigram_counts.get(left).get(right):          # should exist, but just in case...
                         count = bigram_counts.get(left).get(right)
-                        class_counts[i][j] = count                  # set class bigram count
+                        class_counts_table[i][j] = count                  # set class bigram count
                         # class_to_word[i].append(left)
                         # class_to_word[j].append(right)
+
+        # Arrays storing unigram class counts
+        unigram_class_counts_lhs = n * [0]
+        unigram_class_counts_rhs = n * [0]
+        for i in range(n):
+            cl = words_10x[i]           # class/word
+            if unigram_lhs_counts.get(cl):
+                count = unigram_lhs_counts[cl]
+                unigram_class_counts_lhs[i] = count
+            if unigram_rhs_counts.get(cl):
+                count = unigram_rhs_counts[cl]
+                unigram_class_counts_rhs[i] = count
+
+        print(unigram_class_counts_rhs)
 
         # left = words_8k[0]
         # for right in words_8k[1:]:
@@ -110,7 +166,7 @@ class ClassBasedLM:
         #         j = words_10x.index(right)
         #         count = bigram_counts[left][right]
         #         if count != 0:
-        #             class_counts[i][j] = count
+        #             class_counts_table[i][j] = count
         #             non_zeroes[i].append(j)
         #             # word_to_class[left] = i
         #             # word_to_class[right] = j
@@ -122,12 +178,21 @@ class ClassBasedLM:
         #         # bigram_counts_8k[left][right] += 1
         #     left = right
 
+        # This is the set of classes, starting as {0,1,2,...},
+        # We will subtract classes after each merge
+        classes = set(range(n))
+        # print(classes)
+
         # Set instance variables
         self._word_count_10x = word_count_10x
         self._words_10x = words_10x
-        self._class_counts = class_counts
+        self._class_counts_table = class_counts_table
         self._class_to_word = class_to_word
         self._word_to_class = word_to_class
+        self._classes = classes
+        self._unigram_class_counts_lhs = unigram_class_counts_lhs
+        self._unigram_class_counts_rhs = unigram_class_counts_rhs
+        
 
         # TODO
         non_zeroes = defaultdict(list)
@@ -157,7 +222,7 @@ class ClassBasedLM:
         return mi
 
     def mi2(self):
-        counts = self._class_counts
+        counts = self._class_counts_table
         n = len(counts[0])
         T = self._T
         # T = 8000
@@ -171,31 +236,246 @@ class ClassBasedLM:
                     continue
                 left = self._words_10x[i]
                 right = self._words_10x[j]
+                # c_l_r = self._bigram_counts[left][right]
+                # c_l = self._unigram_lhs_counts[left]
+                # c_r = self._unigram_rhs_counts[right]
+                #
                 c_l_r = self._bigram_counts[left][right]
-                c_l = self._unigram_lhs_counts[left]
-                c_r = self._unigram_rhs_counts[right]
+                c_l = self._unigram_counts[left]
+                c_r = self._unigram_counts[right]
                 # if not c_l or not c_r:
                 #     continue
-                mi += (c_l_r / T) * np.log2(T * c_l_r / (c_l * c_r))
+                mi += c_l_r / float(T) * np.log2(T * c_l_r / ((float(c_l) * c_r)))
                 # self.pmi_adj_pairs[left][right] = pmi
         # print('done with adj pairs')
         return mi
 
+    def mi3(self):
+        counts = self._class_counts_table
+        n = len(counts[0])
 
-    def merge(self):
-        n = len(self._words_10x)
+        T = self._T
+        B = self._B
+        U = self._U
+        # T = len(sum(self.unigram_counts.values()))
+        print('size of text', T)
+        print('size of bigrams', B)
+        print('size of unigrams', U)
+
+        # T = 8000
+        # tokens = self._tokens[:8000]
+        # tokens = ['<s>'] + tokens + ['</s>']
+
+        # print(self.bigram_counts)
+        # print(self._unigram_counts)
+        mi = 0
+
+        for left in self.bigram_counts:
+            for right in self.bigram_counts[left]:
+                # print(left, right, self.bigram_counts[left][right])
+                c_l_r = self._bigram_counts[left][right]
+                # c_l = self._unigram_counts[left]
+                # c_r = self._unigram_counts[right]
+                c_l = self._unigram_lhs_counts[left]
+                c_r = self._unigram_rhs_counts[right]
+                mi += c_l_r / float(B) * np.log2(B * c_l_r / ((float(c_l) * c_r)))
+            # self.pmi_adj_pairs[left][right] = pmi
+
+        print('done with MI', mi, B)
+        return mi
+
+    def mi4(self):      # latest: get bigrams of 8k text
+        counts = self._class_counts_table
+        n = len(counts[0])
+
+        T = self._T
+        B = self._B
+        U = self._U
+        tokens = self._tokens[:8000]
+        bg = list(zip(tokens, tokens[1:]))
+        bg_uniq = set(bg)
+
+        print(bg_uniq)
+        mi = 0
+        # unig = Counter(tokens)
+        for (left, right) in bg_uniq:
+            # for right in self.bigram_counts[left]:
+            # print(left, right, self.bigram_counts[left][right])
+            c_l_r = self._bigram_counts[left][right]
+            c_l = self._unigram_counts[left]
+            c_r = self._unigram_counts[right]
+            # c_l = unig[left]
+            # c_r = unig[right]
+            mi += c_l_r / float(B) * np.log2(B * c_l_r / ((float(c_l) * c_r)))
+            # self.pmi_adj_pairs[left][right] = pmi
+
+        print('done with MI', mi, B)
+        return mi
+
+    def merge(self, stop=15):
+        mi = self.mi4()     # initial mi
+        classes = self._classes
+        table_losses = [len(classes) * [0] for x in range(len(classes))]
+
+        # Iterate until stop condition is reached
+        while len(classes) > stop:
+
+            # Get the first class A to merge
+            for a in self._classes:
+                s_k_a = self.sum_k(a)
+                min_loss_a_b = math.inf
+                min_loss_b = None
+                for b in self._classes:
+
+                    s_k_b = self.sum_k(b)
+
+                    # Compute sums of columns and rows to be subtracted.
+                    # These are all class bigrams containing a and those
+                    # containing b. This is the subtraction subterm.
+                    loss_a_b =  s_k_a + s_k_b - self.quality(a, b) - self.quality(b, a) + self.add(a, b)
+                    if loss_a_b < min_loss_a_b:
+                        min_loss_a_b = loss_a_b
+                        min_loss_b = b
+
+                    print(a,b,loss_a_b)
+                    print('min loss for ', a, min_loss_b, min_loss_a_b)
+                # table_losses[a][b]
+
+                    # n = le    `n(self._words_10x)
+        #
+        # for a in self._class_counts_table:
+        #     for b in self._class_counts_table:
+        #         q =
+        #
+        #
+        # for i in range(n-1, 0, -1):
+        #     for m in range(n):
+        #         left = self._words_10x[i]
+        #         right = self._words_10x[j]
+        #         if bigram_counts.get(left):
+        #             if bigram_counts.get(left).get(right):  # should exist, but just in case...
+        #                 count = bigram_counts.get(left).get(right)
+        #                 class_counts[i][j] = count  # set class bigram count
+        #                 # class_to_word[i].append(left)
+        #                 # class_to_word[j].append(right)
+
+    # def init_l_k(self, mi, a, b):
+    #     return self.subtract(a, b) + self.add(a, b)
+
+    def add(self, a, b):
+        s = 0
+        T = self._B
+
+        # Sum the quality for all class pairs for future merge of a+b
+
+        c_lhs_ab = self.unigram_class_counts_lhs[a] + self.unigram_class_counts_lhs[b]
+        c_rhs_ab = self.unigram_class_counts_rhs[a] + self.unigram_class_counts_rhs[b]
+
+        for c in self._classes:
+            # count = self._class_counts_table[b][a]
+            # c_l_r = self._bigram_counts[left][right]
+
+            # This is a+b on the left-hand-side (lhs)
+            c_ab_c = self._class_counts_table[a][c] + self._class_counts_table[b][c]
+            # c_lhs_ab = self._unigram_lhs_counts[a] + self._unigram_lhs_counts[b]
+            c_rhs_c = self.unigram_class_counts_rhs[c]
+            s += c_ab_c / float(T) * np.log2(T * c_ab_c / ((float(c_lhs_ab) * c_rhs_c)))
+
+            # This is a+b on the right-hand-side (lhs)
+            c_c_ab = self._class_counts_table[c][a] + self._class_counts_table[c][b]
+            # c_rhs_ab = self._unigram_rhs_counts[a] + self._unigram_rhs_counts[b]
+            c_lhs_c = self.unigram_class_counts_lhs[c]
+            s += c_c_ab / float(T) * np.log2(T * c_c_ab / ((float(c_lhs_c) * c_rhs_ab)))
+
+        # This is a+b on both sides: (a+b)(a+b)
+        c_ab_ab =  self._class_counts_table[a][a] + self._class_counts_table[a][b] + \
+                   self._class_counts_table[b][a] + self._class_counts_table[b][b]
+        s += c_ab_ab / float(T) * np.log2(T * c_ab_ab / ((float(c_lhs_ab) * c_rhs_ab)))
+
+        return s
+
+    # def subtract(self, a, b):
+    #
+    #     # Compute sums of columns and rows to be subtracted.
+    #     # These are all class bigrams containing a and those
+    #     # containing b. This is sk.
+    #     sub = 0
+    #     s_a = self.row_col_sum(a)
+    #     s_b = self.row_col_sum(b)
+    #     return s_a + s_b - self.quality(a, b) - self.quality(b, a)
+
+    def sum_k(self, a):
+        """
+        Compute sum of quality (mi contribution)
+        of all pairs (l, r) containing
+        Class A. We do so by iterating through the columns and rows
+        of the matrix.
+        These are all class bigrams containing a.
+        :param a:
+        :return: sum
+        """
+
+        # Sum the quality for all class pairs containing A
+        s = 0
+        for b in self._classes:
+            # count = self._class_counts_table[b][a]
+            s += self.quality(b, a)
+            s += self.quality(a, b)
+        # subtract double counted intersection
+        s - self.quality(a, a)
+        return s
+
+    def quality(self, a, b):
+        T = self._B
+        # c_l_r = self._bigram_counts[left][right]
+        c_l_r = self._class_counts_table[a][b]
+        # left = self._words_10x[a]
+        # right = self._words_10x[b]
+        # c_l = self._unigram_lhs_counts[left]
+        # c_r = self.unigram_rhs_counts[right]
+        c_l = self._unigram_class_counts_lhs[a]
+        c_r = self._unigram_class_counts_rhs[b]
 
 
-        for i in range(n-1, 0, -1):
-            for m in range(n):
-                left = self._words_10x[i]
-                right = self._words_10x[j]
-                if bigram_counts.get(left):
-                    if bigram_counts.get(left).get(right):  # should exist, but just in case...
-                        count = bigram_counts.get(left).get(right)
-                        class_counts[i][j] = count  # set class bigram count
-                        # class_to_word[i].append(left)
-                        # class_to_word[j].append(right)
+        return c_l_r / float(T) * np.log2(T * c_l_r / ((float(c_l) * c_r)))
+
+    # def quality_merged_left(self, a, b, r):
+    #     T = self._B
+    #     # c_l_r = self._bigram_counts[left][right]
+    #     c_l_r = self._class_counts_table[a][r] +  self._class_counts_table[b][r]
+    #     c_l = self._unigram_lhs_counts[a] + self._unigram_lhs_counts[b]
+    #     c_r = self.unigram_rhs_counts[r]
+    #     return c_l_r / float(T) * np.log2(T * c_l_r / ((float(c_l) * c_r)))
+    #
+    # def quality_merged_right(self, a, b, l):
+    #     T = self._B
+    #     # c_l_r = self._bigram_counts[left][right]
+    #     c_l_r = self._class_counts_table[l][a] +  self._class_counts_table[l][b]
+    #     c_r = self._unigram_rhs_counts[a] + self._unigram_rhs_counts[b]
+    #     c_l = self.unigram_lhs_counts[l]
+    #     return c_l_r / float(T) * np.log2(T * c_l_r / ((float(c_l) * c_r)))
+    #
+    #
+    # def quality_merged_both_sides(self, a, b):
+    #     T = self._B
+    #     # c_l_r = self._bigram_counts[left][right]
+    #     c_l_r = self._class_counts_table[l][a] +  self._class_counts_table[l][b]
+    #     c_r = self._unigram_rhs_counts[a] + self._unigram_rhs_counts[b]
+    #     c_l = self.unigram_lrighths_counts[l]
+    #     return c_l_r / float(T) * np.log2(T * c_l_r / ((float(c_l) * c_r)))
+    #
+    #
+    # def quality_merged(self, a, b):
+    #   # Sum the quality for all class pairs containing A
+    #     for b in self._classes:
+    #         # count = self._class_counts_table[b][a]
+    #         s += self.quality(b, a)
+    #         s += self.quality(a, b)
+    #     # subtract double counted intersection
+    #     s - self.quality(a,a)
+    #     return
+    #
+
 
     def count_adjacent_word_pairs(self):
         self.counts_adj_pairs = defaultdict(lambda: defaultdict(lambda: 0))
@@ -282,7 +562,7 @@ class ClassBasedLM:
                 dictionary of unigram
                 counts.
         """
-        return self._unigrams_lhs_counts
+        return self._unigram_lhs_counts
 
     @property
     def unigram_rhs_counts(self):
@@ -292,7 +572,7 @@ class ClassBasedLM:
                 dictionary of unigram
                 counts.
         """
-        return self._unigrams_rhs_counts
+        return self._unigram_rhs_counts
 
     @property
     def bigram_counts(self):
@@ -312,7 +592,7 @@ class ClassBasedLM:
                 dictionary of bigram
                 counts.
         """
-        return self._class_counts
+        return self._class_counts_table
 
 
     @property
@@ -334,7 +614,7 @@ class ClassBasedLM:
     def print_class_counts_table(self, n):
         for i in range(n):
             for j in range(n):
-                print(self._class_counts[i][j], end=' ')
+                print(self._class_counts_table[i][j], end=' ')
             print()
 
     # @property
@@ -355,7 +635,6 @@ class ClassBasedLM:
 
 
 if __name__ == "__main__":
-
     # Test
     stream = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
     tokens = []
@@ -364,22 +643,34 @@ if __name__ == "__main__":
             tokens.append(line.strip())
 
     model = ClassBasedLM(tokens)
-    model.print_class_counts_table(40)
+
     print(model.words_10x)
-    print(model.class_to_word[3])
-    print(model.class_to_word[10])
-    print(model.class_counts[3][10])
-    print(model.bigram_counts['and']['I'])
+    print(model.bigram_counts)
+    print(model._unigram_counts)
+    model.print_class_counts_table(8)
+    print(model.words_10x)
+    # print(model.class_to_word[3])
+    # print(model.class_to_word[10])
+    # print(model.class_counts[3][10])
+    # print(model.bigram_counts['and']['I'])
+    #
+    # print(model.class_counts[3][10]==model.bigram_counts['and']['I'])
+    # print(model.words_10x[0])
+    # print(model.words_10x[1])
+    # print(model.bigram_counts['the']['I'])
+    # print(model.class_counts[1][10]==model.bigram_counts['the']['I'])
+    # print(model.bigram_counts['the'])
 
-    print(model.class_counts[3][10]==model.bigram_counts['and']['I'])
-    print(model.words_10x[0])
-    print(model.words_10x[1])
-    print(model.bigram_counts['the']['I'])
-    print(model.class_counts[1][10]==model.bigram_counts['the']['I'])
-    print(model.bigram_counts['the'])
+    # print(len(model.class_counts[0]))
+    # print(model.class_counts)
 
-    print(len(model.class_counts[0]))
-    print('mi=', model.mi2())
+    model.print_class_counts_table(5)
+    # print('mi=', model.mi2())
+
+    print('init mi=', model.mi4())
+
+    model.merge(1)
+
     # for i in range(20):
     #     for j in range(20):
     #         print(model._class_counts[i][j], end=' ')
