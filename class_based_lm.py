@@ -81,7 +81,8 @@ class ClassBasedLM:
         self._unigram_counts = unigram_counts
         L = sum(unigram_lhs_counts.values())
         R = sum(unigram_rhs_counts.values())
-        print(L, R, L==R)
+
+        # print(L, R, L==R)
         self._U = L
         self._B = B
 
@@ -123,8 +124,8 @@ class ClassBasedLM:
         # print('done with MI', mi, B)
 
         word_count = Counter(words_8k)
-        word_count_10x = [(w, c) for w, c in word_count.items() if c >= 2]              # [('man', 3), ('the', 22),  ...]
-        word_count_10x = sorted(word_count_10x, key=lambda x: x[1], reverse=True)       # [('the', 22), ('man', 3), ...]
+        word_count_10x = [(w, c) for w, c in word_count.items() if c >= 10]              # [('man', 3), ('the', 22),  ...]
+        # word_count_10x = sorted(word_count_10x, key=lambda x: x[1], reverse=True)       # [('the', 22), ('man', 3), ...]
         words_10x = [w for w, c in word_count_10x ]                                     # [('the', 'man', ...]
         word_to_class = {w: i for i, w in enumerate(words_10x)}                         # {'the': 0, 'man': 1, ...}
         class_to_word = {i: set([w]) for i, w in enumerate(words_10x)}                  # {0: {'the',...}, 1: {'man',...}, ...}
@@ -157,8 +158,6 @@ class ClassBasedLM:
                 count = unigram_rhs_counts[cl]
                 unigram_class_counts_rhs[i] = count
 
-        print(unigram_class_counts_rhs)
-
         # left = words_8k[0]
         # for right in words_8k[1:]:
         #     if left in words_10x and right in words_10x:
@@ -180,8 +179,14 @@ class ClassBasedLM:
 
         # This is the set of classes, starting as {0,1,2,...},
         # We will subtract classes after each merge
-        classes = set(range(n))
+        classes = list(range(n))
         # print(classes)
+        print('\nunigram class counts\n')
+        print(classes)
+        print(unigram_class_counts_lhs)
+        print(unigram_class_counts_rhs)
+        print('lhs\n', unigram_lhs_counts)
+        print('rhs\n', unigram_rhs_counts)
 
         # Set instance variables
         self._word_count_10x = word_count_10x
@@ -314,31 +319,69 @@ class ClassBasedLM:
 
     def merge(self, stop=15):
         mi = self.mi4()     # initial mi
-        classes = self._classes
-        table_losses = [len(classes) * [0] for x in range(len(classes))]
+        n = len(self._classes)
+        table_losses = [n * [0] for x in range(n)]
 
         # Iterate until stop condition is reached
-        while len(classes) > stop:
+        # while len(classes) > stop:
+        # for i in range(1):
+        #     print('iter=', i)
+        #     # classes = self._classes
 
             # Get the first class A to merge
-            for a in self._classes:
-                s_k_a = self.sum_k(a)
-                min_loss_a_b = math.inf
-                min_loss_b = None
-                for b in self._classes:
+        iter = 0
+        for a in list(self._classes):
 
-                    s_k_b = self.sum_k(b)
+            if len(self._classes) < stop:
+                break
 
-                    # Compute sums of columns and rows to be subtracted.
-                    # These are all class bigrams containing a and those
-                    # containing b. This is the subtraction subterm.
-                    loss_a_b =  s_k_a + s_k_b - self.quality(a, b) - self.quality(b, a) + self.add(a, b)
-                    if loss_a_b < min_loss_a_b:
-                        min_loss_a_b = loss_a_b
-                        min_loss_b = b
+            print('iter=', iter)
+            print('classes remaining')
+            print(self._classes)
 
-                    print(a,b,loss_a_b)
-                    print('min loss for ', a, min_loss_b, min_loss_a_b)
+            s_k_a = self.sum_k(a)
+            print('a=', a, 'sk_a=', s_k_a)
+            min_loss_a_b = math.inf
+            min_loss_b = None
+            for b in self._classes:
+
+                # print('b=', b)
+                if self._class_counts_table[a][b] == 0:
+
+                    # print('bg=0, skipping')
+                    continue
+
+                s_k_b = self.sum_k(b)
+
+                # print('sk_b=', s_k_b)
+
+                # Compute sums of columns and rows to be subtracted.
+                # These are all class bigrams containing a and those
+                # containing b. This is the subtraction subterm.
+                loss_a_b = s_k_a + s_k_b - self.quality(a, b) - self.quality(b, a) + self.add(a, b)
+
+                # print('loss=', loss_a_b)
+
+                if loss_a_b < min_loss_a_b:
+                    min_loss_a_b = loss_a_b
+                    min_loss_b = b
+
+                    print('got min for ', min_loss_b)
+
+                print(a,b,loss_a_b)
+
+            print('merging', a, min_loss_b)
+            print('min loss for ', a, min_loss_b, min_loss_a_b)
+            print('removing ', min_loss_b)
+            print(self._classes)
+
+            self._classes.remove(min_loss_b)
+            iter += 1
+            # break
+
+        print("STOP")
+        print('classes left', self._classes)
+
                 # table_losses[a][b]
 
                     # n = le    `n(self._words_10x)
@@ -371,26 +414,69 @@ class ClassBasedLM:
         c_lhs_ab = self.unigram_class_counts_lhs[a] + self.unigram_class_counts_lhs[b]
         c_rhs_ab = self.unigram_class_counts_rhs[a] + self.unigram_class_counts_rhs[b]
 
+        # print('a=', a, 'b=', b, 'c_lhs/rhs_ab', c_lhs_ab, c_rhs_ab)
+
         for c in self._classes:
+
+
             # count = self._class_counts_table[b][a]
             # c_l_r = self._bigram_counts[left][right]
 
             # This is a+b on the left-hand-side (lhs)
             c_ab_c = self._class_counts_table[a][c] + self._class_counts_table[b][c]
+
             # c_lhs_ab = self._unigram_lhs_counts[a] + self._unigram_lhs_counts[b]
             c_rhs_c = self.unigram_class_counts_rhs[c]
-            s += c_ab_c / float(T) * np.log2(T * c_ab_c / ((float(c_lhs_ab) * c_rhs_c)))
+
+            # print('c=', c, 'c_ab_c', c_ab_c, 'c_rhc_c', c_rhs_c)
+
+            if c_ab_c == 0:
+                s += 0
+                # print('ab-c: zero found, skipping')
+                continue
+
+
+            try:
+                s += c_ab_c / float(T) * np.log2(T * c_ab_c / ((float(c_lhs_ab) * c_rhs_c)))
+            except RuntimeWarning:
+                s += 0
+
+            # print(s)
 
             # This is a+b on the right-hand-side (lhs)
             c_c_ab = self._class_counts_table[c][a] + self._class_counts_table[c][b]
             # c_rhs_ab = self._unigram_rhs_counts[a] + self._unigram_rhs_counts[b]
             c_lhs_c = self.unigram_class_counts_lhs[c]
-            s += c_c_ab / float(T) * np.log2(T * c_c_ab / ((float(c_lhs_c) * c_rhs_ab)))
+
+            # print('c_c_ab', c_c_ab, 'c_lhs_c', c_lhs_c)
+            if c_c_ab == 0:
+                s += 0
+                # print('c-ab: zero found, skipping')
+                continue
+
+            try:
+                s += c_c_ab / float(T) * np.log2(T * c_c_ab / ((float(c_lhs_c) * c_rhs_ab)))
+            except RuntimeWarning:
+                s += 0
+
+            # print(c_c_ab / float(T) * np.log2(T * c_c_ab / ((float(c_lhs_c) * c_rhs_ab))))
 
         # This is a+b on both sides: (a+b)(a+b)
         c_ab_ab =  self._class_counts_table[a][a] + self._class_counts_table[a][b] + \
                    self._class_counts_table[b][a] + self._class_counts_table[b][b]
-        s += c_ab_ab / float(T) * np.log2(T * c_ab_ab / ((float(c_lhs_ab) * c_rhs_ab)))
+
+        # print('c_ab_ab', c_ab_ab)
+
+        if c_ab_ab == 0:
+            # print('ab-ab: zero found, skipping')
+            return s
+
+        try:
+            s += c_ab_ab / float(T) * np.log2(T * c_ab_ab / ((float(c_lhs_ab) * c_rhs_ab)))
+        except RuntimeWarning:
+            s += 0
+
+        # print('add done', s)
 
         return s
 
@@ -422,11 +508,16 @@ class ClassBasedLM:
             s += self.quality(b, a)
             s += self.quality(a, b)
         # subtract double counted intersection
-        s - self.quality(a, a)
+        s -= self.quality(a, a)
+
+        # print('sum ', s)
+
         return s
 
     def quality(self, a, b):
         T = self._B
+        # print(T)
+        q = 0
         # c_l_r = self._bigram_counts[left][right]
         c_l_r = self._class_counts_table[a][b]
         # left = self._words_10x[a]
@@ -435,9 +526,20 @@ class ClassBasedLM:
         # c_r = self.unigram_rhs_counts[right]
         c_l = self._unigram_class_counts_lhs[a]
         c_r = self._unigram_class_counts_rhs[b]
+        # print(c_l_r, '/', c_l, '*', c_r)
 
+        if c_l_r == 0:
+            return q
 
-        return c_l_r / float(T) * np.log2(T * c_l_r / ((float(c_l) * c_r)))
+        try:
+            q = c_l_r / float(T) * np.log2(T * c_l_r / ((float(c_l) * c_r)))
+
+        except RuntimeWarning:
+            return q
+
+        # print('quality of ', a, b, q)
+
+        return q
 
     # def quality_merged_left(self, a, b, r):
     #     T = self._B
@@ -575,6 +677,26 @@ class ClassBasedLM:
         return self._unigram_rhs_counts
 
     @property
+    def unigram_class_counts_lhs(self):
+        """
+        Get method for unigrams
+        :return:
+                dictionary of unigram
+                counts.
+        """
+        return self._unigram_class_counts_lhs
+
+    @property
+    def unigram_class_counts_rhs(self):
+        """
+        Get method for unigrams
+        :return:
+                dictionary of unigram
+                counts.
+        """
+        return self._unigram_class_counts_rhs
+
+    @property
     def bigram_counts(self):
         """
         Get method for bigrams
@@ -670,7 +792,8 @@ if __name__ == "__main__":
     print('init mi=', model.mi4())
 
     model.merge(1)
-
+    print(model.words_10x)
+    print(model._classes)
     # for i in range(20):
     #     for j in range(20):
     #         print(model._class_counts[i][j], end=' ')
