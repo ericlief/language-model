@@ -848,12 +848,12 @@ if __name__ == "__main__":
             tags.append(tag)
 
     # Word based model
-    model_words = ClassBasedLM(tokens)
-    model_words.merge()
+    # model_words = ClassBasedLM(tokens)
+    # model_words.merge()
 
-            # The tag model
-    # model_tags = ClassBasedLM(tags)
-    # model_tags.merge()
+    # The tag model
+    model_tags = ClassBasedLM(tags)
+    model_tags.merge()
     # print(model_tags._bigram_counts['NNP'])
     # print(model_tags._bigram_counts['FW'])
     # print(model_tags._bigram_counts['WP'])
