@@ -30,16 +30,16 @@ class ClassBasedLM:
         # Pointwise MI (Uncomment)
 
         # Get counts for all adjacent word pairs
-        self.count_adjacent_word_pairs()
+        # self.count_adjacent_word_pairs()
+        #
+        # # Calculate pointwise mutual information (PMI) for adjacent word pairs
+        # self.pointwise_mutual_information_adj_pairs()
 
-        # Calculate pointwise mutual information (PMI) for adjacent word pairs
-        self.pointwise_mutual_information_adj_pairs()
-
-        # Get counts for all distant word pairs
-        self.count_distant_word_pairs()
-
-        # Calculate pointwise mutual information (PMI) for distant word pairs
-        self.pointwise_mutual_information_dist_pairs()
+        # # Get counts for all distant word pairs
+        # self.count_distant_word_pairs()
+        #
+        # # Calculate pointwise mutual information (PMI) for distant word pairs
+        # self.pointwise_mutual_information_dist_pairs()
 
     def init_n_grams(self, tokens):
         """
@@ -87,7 +87,7 @@ class ClassBasedLM:
         # words_8k = tokens[:8000]
         words_8k = tokens       # to use as much data for tags (uncomment)
         word_count = Counter(words_8k)
-        word_count_10x = [(w, c) for w, c in word_count.items() if c >= 10]              # [('man', 3), ('the', 22),  ...]
+        word_count_10x = [(w, c) for w, c in word_count.items() if c >= 5]              # [('man', 3), ('the', 22),  ...]
         word_count_10x = sorted(word_count_10x, key=lambda x: x[0], reverse=True)       # [('the', 22), ('man', 3), ...]
         words_10x = [w for w, c in word_count_10x]                                      # [('the', 'man', ...]
         word_to_class = {w: i for i, w in enumerate(words_10x)}                         # {'the': 0, 'man': 1, ...}
@@ -448,7 +448,7 @@ class ClassBasedLM:
         # self.print_class_counts_table(len(self._class_counts_table))
 
         # Write final results
-        with open('out.txt', 'w') as f:
+        with open('tag-cz.txt', 'w') as f:
             f.write('\nHistory of merges\n')
             f.write('k\ti\tj\n')
 
@@ -834,23 +834,24 @@ class ClassBasedLM:
 
 if __name__ == "__main__":
     # Test
-    stream = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
-    #stream = io.TextIOWrapper(sys.stdin.buffer, encoding='iso-8859-2')
+    #stream = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
+    stream = io.TextIOWrapper(sys.stdin.buffer, encoding='iso-8859-2')
 
-    # tokens = []
-    # tags = []
-    # for line in stream:
-    #     if line != '\n':
-    #         # print(line)
-    #         line = line.strip()
-    #         word, tag = line.split('/')
-    #         tokens.append(word)
-    #         tags.append(tag)
+    tokens = []
+    tags = []
+    for line in stream:
+        if line != '\n':
+            # print(line)
+            line = line.strip()
+            word, tag = line.split('/')
+            tokens.append(word)
+            tags.append(tag)
 
     # Word based model
-    #model_words.merge()
+    model_words = ClassBasedLM(tokens)
+    model_words.merge()
 
-    # The tag model
+            # The tag model
     # model_tags = ClassBasedLM(tags)
     # model_tags.merge()
     # print(model_tags._bigram_counts['NNP'])
@@ -860,23 +861,23 @@ if __name__ == "__main__":
     # print(model_tags._bigram_counts['VBN'])
 
     # word pairs
-    tokens = []
-    for line in stream:
-        if line != '\n':
-            line = line.rstrip()
-            tokens.append(line)
+    # tokens = []
+    # for line in stream:
+    #     if line != '\n':
+    #         line = line.rstrip()
+    #         tokens.append(line)
 
-    model_words = ClassBasedLM(tokens)
 
-    out = "adj.txt"
-    with open(out, 'w') as f:
-        for w1, seconds in model_words.pmi_adj_pairs.items():
-            for w2, count in seconds.items():
-                f.write(str(count) + '\t' + w1 + '\t' + w2 + '\t' + '\n')
-    out = "dist.txt"
-    with open(out, 'w') as f:
-        for w1, seconds in model_words.pmi_dist_pairs.items():
-            for w2, count in seconds.items():
-                f.write(str(count) + '\t' + w1 + '\t' + w2 + '\t' + '\n')
 
+    # out = "adj.txt"
+    # with open(out, 'w') as f:
+    #     for w1, seconds in model_words.pmi_adj_pairs.items():
+    #         for w2, count in seconds.items():
+    #             f.write(str(count) + '\t' + w1 + '\t' + w2 + '\t' + '\n')
+    # out = "dist.txt"
+    # with open(out, 'w') as f:
+    #     for w1, seconds in model_words.pmi_dist_pairs.items():
+    #         for w2, count in seconds.items():
+    #             f.write(str(count) + '\t' + w1 + '\t' + w2 + '\t' + '\n')
+    #
 
