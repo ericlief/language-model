@@ -27,19 +27,19 @@ class ClassBasedLM:
         self.init_n_grams(tokens)
         self._V = len(self._unigram_rhs_counts) # size of vocab
 
-        # Uncomment for pointwise MI
+        # Pointwise MI (Uncomment)
 
-        # # Get counts for all adjacent word pairs
-        # self.count_adjacent_word_pairs()
-        #
-        # # Calculate pointwise mutual information (PMI) for adjacent word pairs
-        # self.pointwise_mutual_information_adj_pairs()
-        #
-        # # Get counts for all distant word pairs
-        # self.count_distant_word_pairs()
-        #
-        # # Calculate pointwise mutual information (PMI) for distant word pairs
-        # self.pointwise_mutual_information_dist_pairs()
+        # Get counts for all adjacent word pairs
+        self.count_adjacent_word_pairs()
+
+        # Calculate pointwise mutual information (PMI) for adjacent word pairs
+        self.pointwise_mutual_information_adj_pairs()
+
+        # Get counts for all distant word pairs
+        self.count_distant_word_pairs()
+
+        # Calculate pointwise mutual information (PMI) for distant word pairs
+        self.pointwise_mutual_information_dist_pairs()
 
     def init_n_grams(self, tokens):
         """
@@ -837,18 +837,20 @@ if __name__ == "__main__":
     stream = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
     #stream = io.TextIOWrapper(sys.stdin.buffer, encoding='iso-8859-2')
 
-    tokens = []
-    tags = []
-    for line in stream:
-        if line != '\n':
-            # print(line)
-            line = line.strip()
-            word, tag = line.split('/')
-            tokens.append(word)
-            tags.append(tag)
+    # tokens = []
+    # tags = []
+    # for line in stream:
+    #     if line != '\n':
+    #         # print(line)
+    #         line = line.strip()
+    #         word, tag = line.split('/')
+    #         tokens.append(word)
+    #         tags.append(tag)
 
-    model_words = ClassBasedLM(tokens)
-    model_words.merge()
+    # Word based model
+    #model_words.merge()
+
+    # The tag model
     # model_tags = ClassBasedLM(tags)
     # model_tags.merge()
     # print(model_tags._bigram_counts['NNP'])
@@ -856,3 +858,25 @@ if __name__ == "__main__":
     # print(model_tags._bigram_counts['WP'])
     # print(model_tags._bigram_counts['EX'])
     # print(model_tags._bigram_counts['VBN'])
+
+    # word pairs
+    tokens = []
+    for line in stream:
+        if line != '\n':
+            line = line.rstrip()
+            tokens.append(line)
+
+    model_words = ClassBasedLM(tokens)
+
+    out = "adj.txt"
+    with open(out, 'w') as f:
+        for w1, seconds in model_words.pmi_adj_pairs.items():
+            for w2, count in seconds.items():
+                f.write(str(count) + '\t' + w1 + '\t' + w2 + '\t' + '\n')
+    out = "dist.txt"
+    with open(out, 'w') as f:
+        for w1, seconds in model_words.pmi_dist_pairs.items():
+            for w2, count in seconds.items():
+                f.write(str(count) + '\t' + w1 + '\t' + w2 + '\t' + '\n')
+
+
